@@ -8,16 +8,8 @@ const Web3 = require('web3');
 const web3 = new Web3();
 const jwtSecret = process.env.JWT_SECRET;
 
-// Email service setup
-const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT,
-    secure: false,
-    auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS
-    }
-});
+// Email service setup (PENDING)
+
 
 // Middleware to simulate authentication
 const authenticateHeadmaster = (req, res, next) => {
@@ -230,14 +222,7 @@ router.post('/approveChange/:id', authenticateHeadmaster,verifyToken, async (req
         }
             // Notify all teachers (off-chain logic for emails)
             const teacherList = await Teacher.find();
-            teacherList.forEach(t => {
-                transporter.sendMail({
-                    from: process.env.EMAIL_USER,
-                    to: t.email,
-                    subject: 'School Change Notification',
-                    text: `Sir/Madam, ${teacher.name} has changed the school to ${teacher.currentSchool}.`
-                });
-            });
+            // (PENDING)
             res.json({ message: 'School change approved' });
         
     } catch (error) {
@@ -266,12 +251,7 @@ router.post('/rejectChange/:id', authenticateHeadmaster, async (req, res) => {
         }
 
         // Notify the specific teacher (off-chain logic for emails)
-        transporter.sendMail({
-            from: process.env.EMAIL_USER,
-            to: teacher.email,
-            subject: 'School Change Request Rejected',
-            text: 'Your request to change school has been rejected.'
-        });
+        // (PENDING)
         res.json({ message: 'School change rejected' });
     } catch (error) {
         res.status(400).json({ error: error.message });
