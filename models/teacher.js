@@ -27,6 +27,10 @@ const teacherSchema = new mongoose.Schema({
         type: String,
         default: ''
     },
+    reason: {
+        type: String,
+        default: ''
+    },
     ethAddress: String // Ethereum Address
 });
 

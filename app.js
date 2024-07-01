@@ -1,10 +1,14 @@
 const express = require('express');
 const Web3 = require('web3');
+const cors = require('cors');
 const teacherRoutes = require('./routes/teachers');
 const contractABI = require('./build/contracts/LMS.json').abi;
 const contractAddress = process.env.CONTRACTADDRESS;
 
 const app = express();
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(cors());
 
 // Connect to Ganache
 const web3 = new Web3(new Web3.providers.HttpProvider(process.env.GANACHE_URI));
