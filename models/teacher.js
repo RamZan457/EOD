@@ -12,6 +12,10 @@ const teacherSchema = new mongoose.Schema({
     contactNumber: String,
     initialAppointment: String,
     experience: String,
+    role: {
+        type: String,
+        default: 'teacher'
+    },
     grade: String,
     maritalStatus: String,
     homeAddress: String,
