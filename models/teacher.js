@@ -31,6 +31,10 @@ const teacherSchema = new mongoose.Schema({
         type: String,
         default: ''
     },
+    vacancyId: {
+        type: String,
+        default: ''
+    },
     reason: {
         type: String,
         default: ''

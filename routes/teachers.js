@@ -5,6 +5,7 @@ const nodemailer = require('nodemailer');
 const Teacher = require('../models/teacher');
 const School = require('../models/school');
 const Request = require('../models/request');
+const Vacancy = require('../models/vacancy');
 const Web3 = require('web3');
 const web3 = new Web3();
 const jwtSecret = process.env.JWT_SECRET;
@@ -167,6 +168,83 @@ router.post('/register', authenticateHeadmaster, async (req, res) => {
     }
 });
 
+//Get Request By Teacher Email
+router.get('/getRequestByEmail/:email', async (req, res) => {
+    try {
+        const request = await Request.findOne({ email: req.params.email });
+        if (!request) {
+            return res.status(404).json({ error: 'Request not found' });
+        }
+        res.json(request);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get all edit profile requests
+router.get('/getRequests', authenticateHeadmaster, async (req, res) => {
+    try {
+        const requests = await Request.find({ isRequestPending: true });
+        res.json(requests);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+
+// Get teachers by isRequestPending as True
+router.get('/getSchoolChangeRequests', authenticateHeadmaster, async (req, res) => {
+    try {
+        const teachers = await Teacher.find({ isRequestPending: true });
+        res.json(teachers);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get All vacancies
+router.get('/getVacancies', authenticateHeadmaster, async (req, res) => {
+    try {
+        var vacancies = await Vacancy.find({status: 'pending'});
+        const schools = await School.find();
+        const allVacancies = [];
+        for (const vacancy of vacancies) {
+            const school = schools.find(school => school._id.toString() === vacancy.schoolId.toString());
+            allVacancies.push({
+                _id: vacancy._id,
+                schoolId: vacancy.schoolId,
+                schoolName: school.name,
+                schoolLocation: school.city,
+                grade: vacancy.grade
+            });
+        }
+
+        res.json(allVacancies);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get all teachers
+router.get('/getTeachers', authenticateHeadmaster, async (req, res) => {
+    try {
+        const teachers = await Teacher.find();
+        res.json(teachers);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+//Fetch All Schools
+router.get('/getSchools', async (req, res) => {
+    try {
+        const schools = await School.find();
+        res.json(schools);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 //Get teacher by id
 router.get('/:id', async (req, res) => {
     try {
@@ -265,15 +343,6 @@ router.delete('/:id', authenticateHeadmaster, verifyToken, async (req, res) => {
     }
 });
 
-// Get teachers by isRequestPending as True
-router.get('/getSchoolChangeRequests', authenticateHeadmaster, async (req, res) => {
-    try {
-        const teachers = await Teacher.find({ isRequestPending: true });
-        res.json(teachers);
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
 
 
 // Request a school change
@@ -287,8 +356,10 @@ router.post('/requestChange', async (req, res) => {
         if (!teacher) {
             return res.status(404).json({ error: 'Teacher not found' });
         }
+        var [requestedSchool, vacancyId] = req.body.requestedSchool.split('|');
         teacher.isRequestPending = true;
-        teacher.newSchoolRequest = req.body.requestedSchool;
+        teacher.newSchoolRequest = requestedSchool;
+        teacher.vacancyId = vacancyId;
         teacher.reason = req.body.reason;
         await teacher.save();
 
@@ -317,7 +388,11 @@ router.post('/approveChange/:id', authenticateHeadmaster, async (req, res) => {
         teacher.dateOfJoiningNewSchool = new Date().toISOString();
         teacher.isRequestPending = false;
         teacher.newSchoolRequest = '';
+        teacher.reason = '';
+        await Vacancy.findByIdAndUpdate(teacher.vacancyId, { status: 'filled' });
+        teacher.vacancyId = '';
         await teacher.save();
+
 
         // Approve school change on the blockchain
         try {
@@ -346,6 +421,8 @@ router.post('/rejectChange/:id', authenticateHeadmaster, async (req, res) => {
         }
         teacher.isRequestPending = false;
         teacher.newSchoolRequest = '';
+        teacher.reason = '';
+        teacher.vacancyId = '';
         await teacher.save();
 
         // Reject school change on the blockchain
@@ -387,16 +464,6 @@ router.get('/search/:cnic', verifyToken, async (req, res) => {
     }
 });
 
-// Get all teachers
-router.get('/getTeachers', authenticateHeadmaster, async (req, res) => {
-    try {
-        const teachers = await Teacher.find();
-        res.json(teachers);
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
-
 // Add School
 router.post('/addSchool', authenticateHeadmaster, async (req, res) => {
     try {
@@ -422,6 +489,16 @@ router.put('/updateSchool/:id', authenticateHeadmaster, verifyToken, async (req,
     }
 });
 
+// Get All Schools
+router.get('/getSchools', verifyToken, async (req, res) => {
+    try {
+        const schools = await School.find();
+        res.json(schools);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 // Delete School
 router.delete('/deleteSchool/:id', authenticateHeadmaster, verifyToken, async (req, res) => {
     try {
@@ -435,19 +512,9 @@ router.delete('/deleteSchool/:id', authenticateHeadmaster, verifyToken, async (r
     }
 });
 
-// Get All Schools
-router.get('/getSchools', verifyToken, async (req, res) => {
-    try {
-        const schools = await School.find();
-        res.json(schools);
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
-
 
 // Edit Profile Request
-router.post('/addRequest',verifyToken, async (req, res) => {
+router.post('/addRequest', async (req, res) => {
     const request = new Request(req.body);
     try {
         request.isRequestPending = true;
@@ -465,17 +532,6 @@ router.post('/addRequest',verifyToken, async (req, res) => {
         const doe = await Teacher.findOne({ role: 'deo' });
         await sendEmail(doe.email, subject, html);
         res.json({ message: 'Request added' });
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
-
-
-// Get all edit profile requests
-router.get('/getRequests', authenticateHeadmaster, async (req, res) => {
-    try {
-        const requests = await Request.find({ isRequestPending: true });
-        res.json(requests);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
@@ -562,22 +618,6 @@ router.post('/addVacancy', authenticateHeadmaster, async (req, res) => {
             await sendEmail(teacher.email, subject, html);
         }
         res.json({ message: 'Vacancy added' });
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
-
-router.get('/getVacancies', authenticateHeadmaster, async (req, res) => {
-    try {
-        const vacancies = await Vacancy.find();
-        const schools = await School.find();
-        vacancies.forEach(vacancy => {
-            const school = schools.find(school => school._id.toString() === vacancy.schoolId.toString());
-            if (school) {
-                vacancy.schoolName = school.name;
-            }
-        });
-        res.json(vacancies);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
